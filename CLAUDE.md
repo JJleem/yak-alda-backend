@@ -5,13 +5,13 @@
 약 이름 검색 · OCR 분석 · 병용금기 확인 기능 제공.
 
 ## 기획 문서 위치
-모든 기획 문서는 `/Users/molt/Desktop/molt_repository/MediKnow/` 에 있음.
+모든 기획 문서는 `docs/` 폴더에 있음.
 코드 작성 전 반드시 참고:
-- `backend_spec.csv` — 기능명세서 (비즈니스 로직 · 요청/응답 상세)
-- `schema.sql` — Supabase DB 스키마
-- `external_api_spec.csv` — 식약처 공공 API 명세 (파라미터 · 응답 필드)
-- `api_usage_examples.py` — 외부 API 호출 예시 코드
-- `error_codes.csv` — 에러 코드 정의
+- `docs/backend_spec.csv` — 기능명세서 (비즈니스 로직 · 요청/응답 상세)
+- `docs/schema.sql` — Supabase DB 스키마
+- `docs/external_api_spec.csv` — 식약처 공공 API 명세 (파라미터 · 응답 필드)
+- `docs/api_usage_examples.py` — 외부 API 호출 예시 코드
+- `docs/error_codes.csv` — 에러 코드 정의
 
 ## 기술 스택
 - **FastAPI** + Python 3.11

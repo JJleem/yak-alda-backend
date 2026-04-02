@@ -3,13 +3,16 @@ from contextlib import asynccontextmanager
 
 from app.routers import drugs, ocr, interaction
 from app.core.redis import init_redis, close_redis
+from app.core.database import init_db, close_db
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_redis()
+    await init_db()
     yield
     await close_redis()
+    await close_db()
 
 
 app = FastAPI(

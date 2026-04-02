@@ -1,0 +1,15 @@
+에러 코드,HTTP 상태 코드,발생 API,설명,프론트엔드 처리 방법
+INVALID_FILE_TYPE,400,OCR-01,지원하지 않는 파일 형식 (jpg·png·heic만 허용),파일 선택 전 형식 검증 또는 에러 토스트 표시
+IMAGE_TOO_LARGE,413,OCR-01,파일 크기 10MB 초과,업로드 전 파일 크기 확인 또는 에러 토스트 표시
+OCR_FAILED,422,OCR-01,EasyOCR 텍스트 추출 실패 (사진이 너무 흐리거나 빛 반사 등),"'사진을 다시 찍어주세요' 안내 문구 표시, 재촬영 유도"
+NO_DRUG_FOUND,404,OCR-01 / DRUG-01,'OCR 또는 검색 결과에서 매칭되는 약 없음,"'검색 결과가 없습니다' 표시, 직접 입력 유도"
+INVALID_QUERY,400,DRUG-01,검색어 누락 또는 1자 미만,'검색어를 입력해주세요' 안내 (서버 호출 전 프론트에서 먼저 검증 권장)
+NO_RESULT,404,DRUG-01,검색 결과 없음,'검색 결과가 없습니다' 빈 상태 화면 표시
+DRUG_NOT_FOUND,404,DRUG-02,해당 drug_id 약품 없음,이전 화면으로 이동 + 에러 토스트 표시
+INVALID_ID,400,DRUG-02,drug_id 형식 오류,개발 단계 디버깅용 (정상 플로우에서는 발생하지 않아야 함)
+INSUFFICIENT_DRUGS,400,INTERACTION-01,drug_ids 2개 미만 전달,'약을 2개 이상 선택해주세요' 안내 (서버 호출 전 프론트에서 먼저 검증 권장)
+INVALID_DRUG_ID,400,INTERACTION-01,유효하지 않은 drug_id 포함,개발 단계 디버깅용 (정상 플로우에서는 발생하지 않아야 함)
+AI_PARSE_FAILED,500,AI-01 (내부),Claude 응답 JSON 파싱 실패,"서비스 중단 없음 — official_raw 원문으로 자동 fallback, 프론트 처리 불필요"
+AI_UNAVAILABLE,503,AI-01 (내부),Claude API 타임아웃 또는 응답 없음,"서비스 중단 없음 — official_raw 원문으로 자동 fallback, 프론트 처리 불필요"
+UPSTREAM_ERROR,502,공통,외부 API (식약처·DUR) 호출 실패,'잠시 후 다시 시도해주세요' 에러 화면 표시
+TIMEOUT,504,공통,요청 처리 시간 초과,'응답이 너무 오래 걸립니다. 다시 시도해주세요' 표시 + 재시도 버튼 제공

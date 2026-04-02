@@ -1,0 +1,26 @@
+구분,기술 / 라이브러리,용도,버전,선택 이유,담당,비고
+FRONTEND,Expo (React Native),iOS · Android 동시 개발 앱 프레임워크,SDK 52+,코드베이스 하나로 두 플랫폼 동시 배포 가능,프론트,
+FRONTEND,Expo Router,앱 내 화면 라우팅 (파일 기반),2.x,Next.js와 동일한 파일 기반 라우팅 구조 · 딥링크 지원,프론트,
+FRONTEND,NativeWind,React Native에서 Tailwind CSS 문법 사용,4.x,웹(Tailwind)과 동일한 className 스타일링 문법 통일,프론트,
+FRONTEND,Gluestack UI,UI 컴포넌트 라이브러리,1.x,shadcn/ui 개념의 RN 버전 · NativeWind 궁합 최고 · 직접 복사해서 커스터마이징,프론트,
+FRONTEND,axios,백엔드 API HTTP 통신,1.x,params 자동 인코딩 · interceptor · 에러 핸들링 편의성,프론트,fetch 대신 axios 권장
+FRONTEND,expo-camera,카메라 촬영 (약봉투 · 포장지 사진),~,Expo 공식 카메라 라이브러리,프론트,
+FRONTEND,expo-image-picker,갤러리 이미지 선택,~,Expo 공식 이미지 선택 라이브러리,프론트,
+FRONTEND,(추가 예정),,,,,프론트 개발자 작성
+BACKEND,FastAPI,백엔드 API 서버,0.111+,Python AI/ML 생태계 최적 · async 성능 우수 · Pydantic 내장,백엔드,
+BACKEND,Python,백엔드 개발 언어,3.11+,EasyOCR · RapidFuzz · Claude SDK 모두 Python 네이티브,백엔드,
+BACKEND,Pydantic,요청 · 응답 데이터 검증 및 직렬화,2.x,FastAPI 내장 · Claude JSON 응답 파싱 검증에 활용,백엔드,
+BACKEND,EasyOCR,약봉투 · 포장지 텍스트 추출 (OCR),1.7+,오픈소스 · 한국어 지원 · 비용 Zero · Python 네이티브,백엔드,
+BACKEND,RapidFuzz,OCR 결과 오타 교정 및 공식 품목명 정규화,3.x,빠른 퍼지 매칭 · token_sort_ratio로 약 이름 유사도 비교,백엔드,
+BACKEND,Anthropic SDK (Claude),의약 용어 → 사용자 친화적 설명 AI 변환,~,claude-haiku-4-5 모델 사용 · 비용 최소화,백엔드,claude-haiku-4-5
+BACKEND,LangChain,Claude API 파이프라인 관리 · 프롬프트 버전 관리,0.2+,PromptTemplate으로 프롬프트 코드 분리 · 추후 RAG 확장 대비,백엔드,
+BACKEND,Redis,API 응답 캐싱 · 중복 호출 차단,7.x,동일 약 최초 1회만 API 호출 · 이후 캐시 반환 · TTL 관리,백엔드,Upstash Redis (서버리스) 고려
+BACKEND,Supabase,PostgreSQL DB · Auth · Storage,~,무료 티어 · Auth 내장 · pgvector로 추후 RAG 확장 가능,백엔드,
+EXTERNAL API,식약처 e약은요 API,의약품 이름 검색 · 상세 정보 조회,~,공식 공공 데이터 · 무료 · 효능 · 부작용 · 주의사항 데이터 포함,백엔드,공공데이터포털 API 키 필요
+EXTERNAL API,식약처 낱알식별 API,알약 색상 · 모양 · 각인 기반 후보 검색,~,공식 공공 데이터 · 무료 · 이미지 업로드 지원,백엔드,공공데이터포털 API 키 필요
+EXTERNAL API,DUR 품목정보 API,병용금기 · 연령금기 · 임부금기 조회,~,공식 공공 데이터 · 무료 · 안전성 정보 공식 출처,백엔드,공공데이터포털 API 키 필요
+INFRA,서버 호스팅,(미정) FastAPI 서버 배포 환경,~,,백엔드,후보: Railway · Render · AWS EC2
+INFRA,Redis 호스팅,(미정) Redis 배포 환경,~,,백엔드,후보: Upstash (서버리스 · 무료티어) · Railway
+INFRA,Supabase Cloud,DB · Auth 클라우드 호스팅,~,무료 티어로 MVP 운영 가능,백엔드,
+INFRA,GitHub,소스 코드 버전 관리 · 협업,~,,공통,
+INFRA,(추가 예정),,,,,공통,공통 작성

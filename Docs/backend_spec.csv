@@ -1,0 +1,249 @@
+ID,도메인/모듈,기능명,HTTP Method,엔드포인트,비즈니스 로직,연관 DB/테이블,예외 처리 및 상태 코드,요청 데이터 (Request),응답 데이터 (Response),우선순위,진행 상태
+OCR-01,OCR 분석,이미지 OCR 분석,POST,/api/v1/ocr/analyze,"1. 이미지 파일 수신 및 형식 검증 (jpg/png/heic / 10MB 이하)
+2. 이미지 전처리 (EasyOCR 정확도 향상)
+   └ 그레이스케일 변환 → 리사이즈 (최대 1280px) → 이진화(threshold) 처리
+3. EasyOCR로 텍스트 추출
+4. RapidFuzz → 추출 텍스트를 공식 품목명으로 정규화 (유사도 80% 이상만 허용)
+4. 정규화된 품목명으로 Redis 캐시 조회 (key: drug:{품목코드})
+5. 캐시 HIT → 저장된 데이터 바로 반환
+6. 캐시 MISS → 식약처 e약은요 API 호출
+7. Supabase drugs 테이블에서 effect_simple 컬럼 NULL 여부 확인
+8. NULL인 경우 → AI-01 서비스 호출 (official_raw 전달)
+   └ 반환값을 summary / effect_simple / caution_simple / side_effect_simple / dosage_simple 컬럼에 저장
+9. Redis(TTL 7일) + Supabase drugs 테이블 저장
+10. OCR 원문 + 정규화 결과 + 약 정보 목록 반환","Redis: drug:{품목코드} (R/W)
+Supabase: drugs (R/W)
+- drug_id / name / manufacturer
+- effect_raw / caution_raw (식약처 원문)
+- summary / effect_simple / caution_simple
+- side_effect_simple / dosage_simple (AI 생성)
+- created_at / updated_at","400 Bad Request: 지원하지 않는 파일 형식 (INVALID_FILE_TYPE)
+413 Payload Too Large: 파일 크기 10MB 초과 (IMAGE_TOO_LARGE)
+422 Unprocessable Entity: OCR 텍스트 추출 실패 (OCR_FAILED)
+404 Not Found: 약 이름 매칭 결과 없음 (NO_DRUG_FOUND)
+502 Bad Gateway: 식약처 API 호출 실패 (UPSTREAM_ERROR)
+503 Service Unavailable: Claude API 호출 실패 → official_raw 원문으로 fallback
+※ 타임아웃 정책: 전처리+OCR 10초 / 식약처 API 5초 / Claude API 15초
+※ 타임아웃 초과 시 504 Gateway Timeout (TIMEOUT) 반환","[전송 방식] multipart/form-data
+※ JSON이 아닌 파일 전송 전용 방식. 이미지 파일을 서버로 보낼 때 사용.
+
+[파라미터]
+- image: File (필수 / jpg·png·heic / max 10MB)
+
+[프론트엔드 요청 예시 - React Native / Expo]
+const formData = new FormData()
+formData.append('image', {
+  uri: photo.uri,      // 카메라로 찍은 사진 경로
+  type: 'image/jpeg',
+  name: 'drug.jpg'
+})
+fetch('/api/v1/ocr/analyze', {
+  method: 'POST',
+  body: formData
+  // ※ Content-Type 헤더는 별도 지정 불필요 (자동 설정)
+})
+
+[주의사항]
+- headers에 Content-Type: application/json 넣으면 안 됨
+- uri는 file:// 로 시작하는 로컬 경로여야 함","ocr_raw: string[] - EasyOCR 추출 원문 [시스템 내부]
+normalized: string[] - RapidFuzz 정규화 결과 [시스템 내부]
+drugs[]: 약 정보 배열
+  ├ drug_id: string
+  ├ name: string
+  ├ manufacturer: string
+  ├ summary: string [AI-01 생성]
+  ├ effect_simple: string [AI-01 생성]
+  ├ caution_simple: string [AI-01 생성]
+  ├ side_effect_simple: string [AI-01 생성]
+  ├ dosage_simple: string [AI-01 생성]
+  ├ official_raw.effect: string [식약처 원문]
+  ├ official_raw.caution: string [식약처 원문]
+  ├ source: ""cache"" | ""api""
+  └ disclaimer: string",P1,대기
+DRUG-01,약 검색,약 이름 검색,GET,/api/v1/drugs/search,"1. 검색어(q) 수신 및 빈 값 검증 (1자 이상 필수)
+2. RapidFuzz → 검색어를 공식 품목명으로 정규화
+3. Redis 캐시 조회 (key: search:{정규화된이름})
+4. 캐시 HIT → 저장된 목록 바로 반환
+5. 캐시 MISS → 식약처 e약은요 API 검색 호출
+6. 각 결과 항목을 검색어(q)와 RapidFuzz token_sort_ratio로 유사도 계산
+7. 유사도 점수 기준 내림차순 정렬 (관련성 높은 순서로 재배열)
+8. 정렬된 전체 목록 Redis 저장 (TTL 1일)
+9. 정렬된 목록에서 page / limit 기준으로 잘라서 반환
+※ 이 API는 목록만 반환. 상세 정보는 DRUG-02 호출 필요","Redis: search:{정규화된이름} (R/W)
+Supabase: drugs (R)
+- drug_id / name / manufacturer / summary","400 Bad Request: 검색어 누락 또는 1자 미만 (INVALID_QUERY)
+404 Not Found: 검색 결과 없음 (NO_RESULT)
+502 Bad Gateway: 식약처 API 호출 실패 (UPSTREAM_ERROR)
+※ 타임아웃 정책: 식약처 API 5초 / 전체 요청 8초
+※ 타임아웃 초과 시 504 Gateway Timeout (TIMEOUT) 반환","[전송 방식] Query String (URL에 직접 붙임)
+※ GET 요청은 Body가 없고 URL 뒤에 ?key=value 형태로 파라미터를 전달.
+※ 한글 검색어는 반드시 encodeURIComponent() 처리 필요
+  올바른 예: ?q=%ED%83%80%EC%9D%B4%EB%A0%88%EB%86%80
+  잘못된 예: ?q=타이레놀 (일부 환경에서 깨질 수 있음)
+
+[파라미터]
+- q: string (필수 / 1자 이상) - 검색할 약 이름
+- page: int (선택 / 기본값 1) - 페이지 번호
+- limit: int (선택 / 기본값 10 / 최대 30) - 한 페이지 결과 수
+
+[정렬 방식 안내 - 프론트 참고]
+※ 결과는 검색어와의 유사도(관련성) 기준 내림차순으로 정렬되어 반환됨
+※ 프론트에서 별도 정렬 처리 불필요 — 서버에서 이미 정렬된 상태로 옴
+※ relevance_score가 높을수록 검색어와 유사한 약
+
+[프론트엔드 요청 예시]
+// fetch 사용 시 - 한글은 encodeURIComponent 필수
+const query = encodeURIComponent('타이레놀')
+fetch(`/api/v1/drugs/search?q=${query}`)
+
+// 스크롤 내려서 다음 페이지 요청
+fetch(`/api/v1/drugs/search?q=${query}&page=2&limit=10`)
+
+// axios 사용 시 - params 옵션은 자동 인코딩 처리 (별도 처리 불필요)
+axios.get('/api/v1/drugs/search', {
+  params: { q: '타이레놀', page: 1, limit: 10 }
+})
+
+[실제 요청 URL 예시]
+GET /api/v1/drugs/search?q=타이레놀&page=1&limit=10","query: string - 입력된 검색어
+total: int - 전체 결과 수
+page: int - 현재 페이지
+total_pages: int - 전체 페이지 수
+results[]: ※ relevance_score 내림차순 정렬된 상태로 반환
+  ├ drug_id: string
+  ├ name: string [식약처 원문]
+  ├ manufacturer: string [식약처 원문]
+  ├ summary: string [AI-01 생성 / 없으면 null]
+  └ relevance_score: float - 검색어 유사도 점수 (0.0~1.0)
+                     ※ 프론트에서 정렬에 활용 가능 (필요 시)",P1,대기
+DRUG-02,약 검색,약 상세 조회,GET,/api/v1/drugs/{drug_id},"1. drug_id 경로 파라미터 수신 및 형식 검증
+2. Redis 캐시 조회 (key: drug:{drug_id})
+3. 캐시 HIT → 저장된 상세 데이터 바로 반환
+4. 캐시 MISS → Supabase drugs 테이블 조회
+5. Supabase에도 없으면 식약처 e약은요 API 호출 후 저장
+6. Supabase drugs 테이블에서 effect_simple 컬럼 NULL 여부 확인
+7. NULL인 경우 → AI-01 서비스 호출 (official_raw 전달)
+   └ 반환값을 아래 컬럼에 저장:
+      summary / effect_simple / caution_simple
+      side_effect_simple / dosage_simple
+8. Redis(TTL 7일) 저장
+9. 공식 원문 + AI 변환 설명 + 면책 고지 반환","Redis: drug:{drug_id} (R/W)
+Supabase: drugs (R/W)
+- drug_id / name / manufacturer
+- effect_raw / caution_raw / side_effect_raw (식약처 원문)
+- summary / effect_simple / caution_simple
+- side_effect_simple / dosage_simple (AI 생성)
+- created_at / updated_at","400 Bad Request: drug_id 형식 오류 (INVALID_ID)
+404 Not Found: 해당 drug_id 약품 없음 (DRUG_NOT_FOUND)
+502 Bad Gateway: 식약처 API 또는 Claude API 호출 실패
+※ Claude 실패 시 official_raw 원문으로 fallback 처리 (서비스 중단 없음)
+※ 타임아웃 정책: 식약처 API 5초 / Claude API 15초 / 전체 요청 20초
+※ 타임아웃 초과 시 504 Gateway Timeout (TIMEOUT) 반환","[전송 방식] Path Parameter (URL 경로에 직접 포함)
+※ drug_id를 URL 안에 넣어서 전달. Body나 Query String 없음.
+
+[파라미터]
+- drug_id: string (필수) - 약 고유 ID
+
+[프론트엔드 요청 예시]
+// drug_id가 200001234인 약 상세 조회
+fetch('/api/v1/drugs/200001234')
+
+// axios 사용 시
+axios.get(`/api/v1/drugs/${drugId}`)
+
+[실제 요청 URL 예시]
+GET /api/v1/drugs/200001234","drug_id: string
+name: string [식약처 원문]
+manufacturer: string [식약처 원문]
+summary: string [AI-01 생성]
+effect_simple: string [AI-01 생성]
+caution_simple: string [AI-01 생성]
+side_effect_simple: string [AI-01 생성]
+dosage_simple: string [AI-01 생성]
+official_raw:
+  ├ effect: string [식약처 원문]
+  ├ caution: string [식약처 원문]
+  └ side_effect: string [식약처 원문]
+disclaimer: string",P1,대기
+DRUG-03,약 검색,약 이름 정규화,INTERNAL,내부 서비스 함수 (엔드포인트 없음),"1. 입력 텍스트(OCR 결과 또는 검색어) 수신
+2. RapidFuzz token_sort_ratio로 식약처 품목 목록과 유사도 비교
+3. 유사도 80% 이상 결과만 후보 선택
+4. 유사도 기준 내림차순 정렬 후 상위 1개 반환
+5. 매칭 실패(80% 미만) 시 None 반환 → 상위 레이어에서 원문 처리
+※ OCR-01 / DRUG-01 / DRUG-02 에서 공통 호출","Supabase: drug_names (R)
+- drug_id / official_name / manufacturer
+※ 식약처 품목 전체 목록 사전 적재 필요 (초기 세팅)","유사도 80% 미만 전체: None 반환
+입력값 공백 또는 특수문자만: None 반환","Input: raw_text (string)
+Output: normalized_name (string) | None",,P1,대기
+INTERACTION-01,병용금기,병용금기 확인,POST,/api/v1/drugs/interaction,"1. drug_ids 배열 수신 (2개 이상 필수)
+2. 각 drug_id 유효성 검증 (Supabase drugs 테이블 존재 여부)
+3. drug_ids 오름차순 정렬 후 조합 키 생성 (예: 200001234:200005678)
+4. Redis 캐시 조회 (key: interaction:{조합키})
+5. 캐시 HIT → 저장된 결과 바로 반환
+6. 캐시 MISS → DUR 품목정보 API 호출
+7. 결과 있는 경우 → AI-01 서비스 호출 (DUR 원문 전달)
+   └ 반환값을 result_simple 컬럼에 저장
+8. Redis(TTL 7일) + Supabase interactions 테이블 저장
+9. 레벨(safe/warning/danger) + AI 설명 + 면책 고지 반환","Redis: interaction:{코드A}:{코드B} (R/W)
+Supabase: interactions (R/W)
+- drug_id_1 / drug_id_2
+- result / level
+- result_simple (AI 생성)
+- official_raw / created_at","400 Bad Request: drug_ids 2개 미만 (INSUFFICIENT_DRUGS)
+400 Bad Request: 유효하지 않은 drug_id 포함 (INVALID_DRUG_ID)
+404 Not Found: DUR 데이터 없음 → result: unknown 으로 응답 (에러 아님)
+502 Bad Gateway: DUR API 호출 실패
+※ Claude 실패 시 official_raw 원문으로 fallback (서비스 중단 없음)
+※ 타임아웃 정책: DUR API 5초 / Claude API 15초 / 전체 요청 20초
+※ 타임아웃 초과 시 504 Gateway Timeout (TIMEOUT) 반환","[전송 방식] JSON Body
+※ POST 요청. 파라미터를 JSON 형태로 Body에 담아서 전송.
+
+[파라미터]
+- drug_ids: string[] (필수 / 최소 2개) - 비교할 약 ID 배열
+
+[프론트엔드 요청 예시]
+fetch('/api/v1/drugs/interaction', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    drug_ids: ['200001234', '200005678']
+  })
+})
+
+// axios 사용 시
+axios.post('/api/v1/drugs/interaction', {
+  drug_ids: ['200001234', '200005678']
+})
+
+[실제 전송 Body 예시]
+{
+  ""drug_ids"": [""200001234"", ""200005678""]
+}","drugs[]:
+  ├ drug_id: string
+  └ name: string [식약처 원문]
+result: ""safe"" | ""caution"" | ""forbidden"" | ""unknown""
+level: ""safe"" | ""warning"" | ""danger""
+result_simple: string [AI-01 생성 / DUR 데이터 없으면 null]
+official_raw: string [DUR 원문 / 없으면 null]
+disclaimer: string",P2,대기
+AI-01,AI 변환,Claude Text 설명 변환,INTERNAL,내부 서비스 함수 (엔드포인트 없음),"1. 식약처 / DUR 원문 데이터(raw_data) 수신
+2. System 프롬프트 구성:
+   └ '당신은 약사입니다. 중학생도 이해할 수 있게 설명하세요. 진단·처방 의견 금지. JSON 형식으로만 응답하세요.'
+3. User 프롬프트 구성:
+   └ '다음 의약품 정보를 쉽게 설명해주세요: {raw_data}'
+4. Claude claude-haiku-4-5 API 호출 (비용 최소화)
+5. Pydantic 모델로 JSON 응답 파싱 및 구조 검증
+6. 파싱 실패 시 1회 재시도
+7. 재시도 후 실패 시 AI_PARSE_FAILED 에러 반환
+   └ 호출 레이어에서 official_raw 원문으로 fallback 처리
+8. 성공 시 변환 결과 반환 (저장은 호출 레이어에서 담당)
+※ OCR-01 / DRUG-02 / INTERACTION-01 에서 캐시 MISS + DB NULL 시에만 호출","Supabase: drugs / interactions (W)
+※ 저장은 호출한 서비스 레이어(OCR-01 / DRUG-02 / INTERACTION-01)에서 담당","파싱 실패 (JSON 형식 오류): 1회 재시도 후 AI_PARSE_FAILED
+Claude API 응답 없음 (타임아웃 등): AI_UNAVAILABLE
+※ 두 경우 모두 호출 레이어에서 official_raw 원문 fallback — 서비스 중단 없음","Input: raw_data (dict - 식약처 또는 DUR 원문)
+Output:
+  ├ summary: string
+  ├ effect_simple: string
+  ├ caution_simple: string
+  ├ side_effect_simple: string
+  └ dosage_simple: string",,P1,대기

@@ -1,7 +1,8 @@
+from typing import Optional
 import redis.asyncio as aioredis
 from app.core.config import REDIS_URL
 
-_client: aioredis.Redis | None = None
+_client: Optional[aioredis.Redis] = None
 
 
 async def init_redis():

@@ -1,14 +1,80 @@
 import json
-from typing import Optional
+from typing import Optional, List
 import httpx
+from rapidfuzz import fuzz
 from app.core.config import SERVICE_KEY
 from app.core.redis import get_redis
 from app.core.database import get_db
-from app.models.drug import DrugDetailResponse, OfficialRaw
+from app.models.drug import DrugDetailResponse, OfficialRaw, DrugSearchItem, DrugSearchResponse
 from app.services.ai_service import translate_drug_info
 
 EXT01_URL = "http://apis.data.go.kr/1471000/DrbEasyDrugInfoService/getDrbEasyDrugList"
-DRUG_CACHE_TTL = 60 * 60 * 24 * 7  # 7일
+DRUG_CACHE_TTL = 60 * 60 * 24 * 7   # 7일
+SEARCH_CACHE_TTL = 60 * 60 * 24     # 1일
+
+
+async def search_drugs(query: str, page: int, limit: int) -> DrugSearchResponse:
+    """
+    약 이름 검색.
+    Redis → 식약처 API → RapidFuzz 정렬 → 페이지네이션
+    """
+    redis = get_redis()
+    cache_key = f"search:{query}"
+
+    # 1. Redis 캐시 확인
+    cached = await redis.get(cache_key)
+    if cached:
+        all_results = [DrugSearchItem(**item) for item in json.loads(cached)]
+    else:
+        # 2. 식약처 API 호출 (최대 100건)
+        params = {
+            "serviceKey": SERVICE_KEY,
+            "itemName": query,
+            "numOfRows": 100,
+            "pageNo": 1,
+            "type": "json",
+        }
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            resp = await client.get(EXT01_URL, params=params)
+            resp.raise_for_status()
+            data = resp.json()
+
+        items = data.get("body", {}).get("items") or []
+
+        # 3. RapidFuzz 유사도 계산 및 정렬
+        scored = []
+        for item in items:
+            name = item.get("itemName", "")
+            score = fuzz.token_sort_ratio(query, name) / 100.0
+            scored.append(DrugSearchItem(
+                drug_id=item.get("itemSeq", ""),
+                name=name,
+                manufacturer=item.get("entpName"),
+                summary=None,
+                relevance_score=round(score, 4),
+            ))
+
+        all_results = sorted(scored, key=lambda x: x.relevance_score, reverse=True)
+
+        # 4. Redis 저장
+        await redis.setex(
+            cache_key,
+            SEARCH_CACHE_TTL,
+            json.dumps([r.model_dump() for r in all_results], ensure_ascii=False),
+        )
+
+    # 5. 페이지네이션
+    total = len(all_results)
+    start = (page - 1) * limit
+    end = start + limit
+
+    return DrugSearchResponse(
+        query=query,
+        total=total,
+        page=page,
+        total_pages=(total + limit - 1) // limit if total > 0 else 0,
+        results=all_results[start:end],
+    )
 
 
 async def get_drug_detail(drug_id: str) -> Optional[DrugDetailResponse]:

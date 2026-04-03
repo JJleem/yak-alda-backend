@@ -1,13 +1,19 @@
-from fastapi import APIRouter, HTTPException
-from app.services.drug_service import get_drug_detail
+from fastapi import APIRouter, HTTPException, Query
+from app.services.drug_service import get_drug_detail, search_drugs
 
 router = APIRouter()
 
 
 @router.get("/search")
-async def search_drugs(q: str, page: int = 1, limit: int = 10):
-    # TODO: DRUG-01 구현
-    return {"message": "drug search — coming soon", "q": q}
+async def search_drugs_endpoint(
+    q: str = Query(..., min_length=1),
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=1, le=30),
+):
+    results = await search_drugs(q, page, limit)
+    if results.total == 0:
+        raise HTTPException(status_code=404, detail={"code": "NO_RESULT", "message": "검색 결과가 없습니다."})
+    return results
 
 
 @router.get("/{drug_id}")

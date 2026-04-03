@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, List
 from pydantic import BaseModel
 
 
@@ -27,3 +27,19 @@ class AITranslation(BaseModel):
     caution_simple: str
     side_effect_simple: str
     dosage_simple: str
+
+
+class DrugSearchItem(BaseModel):
+    drug_id: str
+    name: str
+    manufacturer: Optional[str] = None
+    summary: Optional[str] = None
+    relevance_score: float
+
+
+class DrugSearchResponse(BaseModel):
+    query: str
+    total: int
+    page: int
+    total_pages: int
+    results: List[DrugSearchItem]

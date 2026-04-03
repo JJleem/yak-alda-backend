@@ -43,3 +43,21 @@ class DrugSearchResponse(BaseModel):
     page: int
     total_pages: int
     results: List[DrugSearchItem]
+
+
+class DrugRef(BaseModel):
+    drug_id: str
+    name: str
+
+
+class InteractionRequest(BaseModel):
+    drug_ids: List[str]
+
+
+class InteractionResponse(BaseModel):
+    drugs: List[DrugRef]
+    result: str   # safe | caution | forbidden | unknown
+    level: str    # safe | warning | danger
+    result_simple: Optional[str] = None
+    official_raw: Optional[str] = None
+    disclaimer: str = "이 정보는 참고용이며 진단·처방을 대체하지 않습니다. 복용 전 전문가와 상담하세요."

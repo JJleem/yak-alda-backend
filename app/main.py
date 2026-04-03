@@ -7,7 +7,6 @@ from contextlib import asynccontextmanager
 from app.routers import drugs, ocr, interaction
 from app.core.redis import init_redis, close_redis
 from app.core.database import init_db, close_db
-from app.services.ocr_service import get_reader
 
 logging.basicConfig(
     level=logging.INFO,
@@ -18,10 +17,9 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("서버 시작 — Redis, DB, EasyOCR 초기화 중...")
+    logger.info("서버 시작 — Redis, DB 초기화 중...")
     await init_redis()
     await init_db()
-    get_reader()
     logger.info("초기화 완료")
     yield
     await close_redis()

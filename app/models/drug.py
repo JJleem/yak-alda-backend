@@ -61,3 +61,9 @@ class InteractionResponse(BaseModel):
     result_simple: Optional[str] = None
     official_raw: Optional[str] = None
     disclaimer: str = "이 정보는 참고용이며 진단·처방을 대체하지 않습니다. 복용 전 전문가와 상담하세요."
+
+
+class OCRResponse(BaseModel):
+    ocr_raw: List[str]
+    normalized: List[str]
+    drugs: List[DrugDetailResponse]

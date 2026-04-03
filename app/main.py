@@ -4,12 +4,14 @@ from contextlib import asynccontextmanager
 from app.routers import drugs, ocr, interaction
 from app.core.redis import init_redis, close_redis
 from app.core.database import init_db, close_db
+from app.services.ocr_service import get_reader
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_redis()
     await init_db()
+    get_reader()  # EasyOCR 모델 미리 로드
     yield
     await close_redis()
     await close_db()

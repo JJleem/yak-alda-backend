@@ -13,14 +13,13 @@ BACKEND,Pydantic,요청 · 응답 데이터 검증 및 직렬화,2.x,FastAPI 내
 BACKEND,EasyOCR,약봉투 · 포장지 텍스트 추출 (OCR),1.7+,오픈소스 · 한국어 지원 · 비용 Zero · Python 네이티브,백엔드,
 BACKEND,RapidFuzz,OCR 결과 오타 교정 및 공식 품목명 정규화,3.x,빠른 퍼지 매칭 · token_sort_ratio로 약 이름 유사도 비교,백엔드,
 BACKEND,Anthropic SDK (Claude),의약 용어 → 사용자 친화적 설명 AI 변환,~,claude-haiku-4-5 모델 사용 · 비용 최소화,백엔드,claude-haiku-4-5
-BACKEND,LangChain,Claude API 파이프라인 관리 · 프롬프트 버전 관리,0.2+,PromptTemplate으로 프롬프트 코드 분리 · 추후 RAG 확장 대비,백엔드,
-BACKEND,Redis,API 응답 캐싱 · 중복 호출 차단,7.x,동일 약 최초 1회만 API 호출 · 이후 캐시 반환 · TTL 관리,백엔드,Upstash Redis (서버리스) 고려
-BACKEND,Supabase,PostgreSQL DB · Auth · Storage,~,무료 티어 · Auth 내장 · pgvector로 추후 RAG 확장 가능,백엔드,
+BACKEND,Redis,API 응답 캐싱 · 중복 호출 차단,7.x,동일 약 최초 1회만 API 호출 · 이후 캐시 반환 · TTL 관리,백엔드,Upstash Redis (서버리스) 사용 중
+BACKEND,asyncpg,PostgreSQL 비동기 드라이버,0.29+,FastAPI async 흐름에 최적 · 커넥션 풀 관리,백엔드,Neon PostgreSQL과 연결
 EXTERNAL API,식약처 e약은요 API,의약품 이름 검색 · 상세 정보 조회,~,공식 공공 데이터 · 무료 · 효능 · 부작용 · 주의사항 데이터 포함,백엔드,공공데이터포털 API 키 필요
 EXTERNAL API,식약처 낱알식별 API,알약 색상 · 모양 · 각인 기반 후보 검색,~,공식 공공 데이터 · 무료 · 이미지 업로드 지원,백엔드,공공데이터포털 API 키 필요
 EXTERNAL API,DUR 품목정보 API,병용금기 · 연령금기 · 임부금기 조회,~,공식 공공 데이터 · 무료 · 안전성 정보 공식 출처,백엔드,공공데이터포털 API 키 필요
-INFRA,서버 호스팅,(미정) FastAPI 서버 배포 환경,~,,백엔드,후보: Railway · Render · AWS EC2
-INFRA,Redis 호스팅,(미정) Redis 배포 환경,~,,백엔드,후보: Upstash (서버리스 · 무료티어) · Railway
-INFRA,Supabase Cloud,DB · Auth 클라우드 호스팅,~,무료 티어로 MVP 운영 가능,백엔드,
+INFRA,Render,FastAPI 서버 배포 환경,~,무료 티어 · GitHub 연동 자동 배포 · Singapore 리전,백엔드,배포 URL: https://yak-alda-backend.onrender.com
+INFRA,Upstash,Redis 서버리스 호스팅,~,무료 티어 · 서버리스 · 글로벌 엣지,백엔드,사용 중
+INFRA,Neon,PostgreSQL 서버리스 DB 호스팅,~,무료 티어 · 서버리스 · 자동 스케일링,백엔드,사용 중
 INFRA,GitHub,소스 코드 버전 관리 · 협업,~,,공통,
 INFRA,(추가 예정),,,,,공통,공통 작성

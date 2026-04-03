@@ -43,7 +43,7 @@ app.add_middleware(
 )
 
 app.include_router(drugs.router, prefix="/api/v1/drugs", tags=["drugs"])
-app.include_router(ocr.router, prefix="/api/v1/ocr", tags=["ocr"])
+# app.include_router(ocr.router, prefix="/api/v1/ocr", tags=["ocr"])  # OCR: 메모리 이슈로 임시 비활성화
 app.include_router(interaction.router, prefix="/api/v1/drugs", tags=["interaction"])
 
 

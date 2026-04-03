@@ -1,6 +1,8 @@
+import asyncio
 from fastapi import APIRouter, HTTPException
 from app.models.drug import InteractionRequest
 from app.services.interaction_service import check_interaction
+from app.core.exceptions import TimeoutError
 
 router = APIRouter()
 
@@ -13,7 +15,11 @@ async def check_interaction_endpoint(body: InteractionRequest):
             detail={"code": "INSUFFICIENT_DRUGS", "message": "drug_ids는 2개 이상 필요합니다."},
         )
 
-    result = await check_interaction(body.drug_ids)
+    try:
+        result = await asyncio.wait_for(check_interaction(body.drug_ids), timeout=20.0)
+    except asyncio.TimeoutError:
+        raise TimeoutError()
+
     if result is None:
         raise HTTPException(
             status_code=400,

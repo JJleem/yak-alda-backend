@@ -1,5 +1,7 @@
+import logging
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
 from app.routers import drugs, ocr, interaction
@@ -7,15 +9,24 @@ from app.core.redis import init_redis, close_redis
 from app.core.database import init_db, close_db
 from app.services.ocr_service import get_reader
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
+logger = logging.getLogger(__name__)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    logger.info("서버 시작 — Redis, DB, EasyOCR 초기화 중...")
     await init_redis()
     await init_db()
-    get_reader()  # EasyOCR 모델 미리 로드
+    get_reader()
+    logger.info("초기화 완료")
     yield
     await close_redis()
     await close_db()
+    logger.info("서버 종료")
 
 
 app = FastAPI(
@@ -25,6 +36,14 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # 배포 후 프론트 도메인으로 교체
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 app.include_router(drugs.router, prefix="/api/v1/drugs", tags=["drugs"])
 app.include_router(ocr.router, prefix="/api/v1/ocr", tags=["ocr"])
 app.include_router(interaction.router, prefix="/api/v1/drugs", tags=["interaction"])
@@ -32,6 +51,7 @@ app.include_router(interaction.router, prefix="/api/v1/drugs", tags=["interactio
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
+    logger.error(f"Unhandled exception: {exc}", exc_info=True)
     return JSONResponse(
         status_code=500,
         content={"code": "INTERNAL_ERROR", "message": "서버 내부 오류가 발생했습니다."},
@@ -39,5 +59,24 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 
 @app.get("/health")
-def health_check():
-    return {"status": "ok"}
+async def health_check():
+    from app.core.redis import get_redis
+    from app.core.database import get_db
+
+    redis_ok = False
+    db_ok = False
+
+    try:
+        await get_redis().ping()
+        redis_ok = True
+    except Exception:
+        pass
+
+    try:
+        await get_db().fetchval("SELECT 1")
+        db_ok = True
+    except Exception:
+        pass
+
+    status = "ok" if redis_ok and db_ok else "degraded"
+    return {"status": status, "redis": redis_ok, "db": db_ok}

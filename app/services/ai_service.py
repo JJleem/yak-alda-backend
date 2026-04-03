@@ -1,9 +1,11 @@
 import json
-import traceback
+import logging
 from typing import Optional
 import anthropic
 from app.core.config import ANTHROPIC_API_KEY
 from app.models.drug import AITranslation
+
+logger = logging.getLogger(__name__)
 
 _client = anthropic.AsyncAnthropic(api_key=ANTHROPIC_API_KEY)
 
@@ -34,10 +36,10 @@ async def translate_drug_info(raw_data: dict) -> Optional[AITranslation]:
                 if raw_text.startswith("json"):
                     raw_text = raw_text[4:]
             result = json.loads(raw_text.strip())
+            logger.info("AI 변환 성공")
             return AITranslation(**result)
         except Exception as e:
-            print(f"[AI] attempt {attempt+1} failed: {e}")
-            traceback.print_exc()
+            logger.warning(f"AI 변환 실패 (attempt {attempt+1}): {e}")
             if attempt == 1:
                 return None
 

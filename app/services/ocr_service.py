@@ -1,10 +1,13 @@
 import io
+import logging
 import numpy as np
 from PIL import Image
 from rapidfuzz import fuzz
 from typing import Optional
 import easyocr
 from app.core.database import get_db
+
+logger = logging.getLogger(__name__)
 
 # 서버 시작 시 1회 초기화 (한국어+영어)
 _reader: Optional[easyocr.Reader] = None
@@ -47,7 +50,7 @@ async def extract_drug_names(image_bytes: bytes) -> tuple[list[str], list[str]]:
     reader = get_reader()
     results = reader.readtext(img_array, detail=0)  # 텍스트만 추출
     ocr_raw = [text.strip() for text in results if text.strip()]
-    print(f"[OCR] 추출 결과: {ocr_raw}")
+    logger.info(f"OCR 추출 결과: {ocr_raw}")
 
     # RapidFuzz로 공식 품목명 정규화
     normalized = []
@@ -82,7 +85,7 @@ async def normalize_drug_name(raw_text: str) -> Optional[str]:
             best_score = score
             best_name = row["official_name"]
 
-    print(f"[DRUG-03] '{raw_text}' → '{best_name}' ({best_score}%)")
+    logger.info(f"DRUG-03 정규화: '{raw_text}' → '{best_name}' ({best_score}%)")
     if best_score >= 80:
         return best_name
     return None

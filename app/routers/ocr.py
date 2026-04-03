@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, UploadFile, File
 from app.models.drug import OCRResponse
 from app.services.ocr_service import extract_drug_names
-from app.services.drug_service import get_drug_detail
+from app.services.drug_service import get_drug_detail, search_drugs
 
 router = APIRouter()
 
@@ -42,7 +42,6 @@ async def analyze_ocr(image: UploadFile = File(...)):
     # 약 상세 조회
     drugs = []
     seen_ids = set()
-    from app.services.drug_service import search_drugs
     for term in search_terms:
         search_result = await search_drugs(term, page=1, limit=1)
         if search_result.results:

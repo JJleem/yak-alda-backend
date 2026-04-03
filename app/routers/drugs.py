@@ -1,5 +1,7 @@
+import asyncio
 from fastapi import APIRouter, HTTPException, Query
 from app.services.drug_service import get_drug_detail, search_drugs
+from app.core.exceptions import TimeoutError
 
 router = APIRouter()
 
@@ -18,7 +20,10 @@ async def search_drugs_endpoint(
 
 @router.get("/{drug_id}")
 async def get_drug_detail_endpoint(drug_id: str):
-    result = await get_drug_detail(drug_id)
+    try:
+        result = await asyncio.wait_for(get_drug_detail(drug_id), timeout=20.0)
+    except asyncio.TimeoutError:
+        raise TimeoutError()
     if result is None:
         raise HTTPException(status_code=404, detail={"code": "DRUG_NOT_FOUND", "message": "해당 약을 찾을 수 없습니다."})
     return result

@@ -1,4 +1,5 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 
 from app.routers import drugs, ocr, interaction
@@ -27,6 +28,14 @@ app = FastAPI(
 app.include_router(drugs.router, prefix="/api/v1/drugs", tags=["drugs"])
 app.include_router(ocr.router, prefix="/api/v1/ocr", tags=["ocr"])
 app.include_router(interaction.router, prefix="/api/v1/drugs", tags=["interaction"])
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    return JSONResponse(
+        status_code=500,
+        content={"code": "INTERNAL_ERROR", "message": "서버 내부 오류가 발생했습니다."},
+    )
 
 
 @app.get("/health")

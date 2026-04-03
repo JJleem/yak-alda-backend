@@ -1,3 +1,4 @@
+import asyncio
 import json
 from typing import Optional, List
 import httpx
@@ -5,6 +6,7 @@ from rapidfuzz import fuzz
 from app.core.config import SERVICE_KEY
 from app.core.redis import get_redis
 from app.core.database import get_db
+from app.core.exceptions import UpstreamError, TimeoutError
 from app.models.drug import DrugDetailResponse, OfficialRaw, DrugSearchItem, DrugSearchResponse
 from app.services.ai_service import translate_drug_info
 
@@ -34,10 +36,15 @@ async def search_drugs(query: str, page: int, limit: int) -> DrugSearchResponse:
             "pageNo": 1,
             "type": "json",
         }
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            resp = await client.get(EXT01_URL, params=params)
-            resp.raise_for_status()
-            data = resp.json()
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                resp = await client.get(EXT01_URL, params=params)
+                resp.raise_for_status()
+                data = resp.json()
+        except httpx.TimeoutException:
+            raise TimeoutError("식약처 API 응답 시간이 초과됐습니다.")
+        except httpx.HTTPError:
+            raise UpstreamError("식약처 API 호출에 실패했습니다.")
 
         items = data.get("body", {}).get("items") or []
 
@@ -161,10 +168,15 @@ async def _fetch_from_api(drug_id: str) -> Optional[dict]:
         "itemSeq": drug_id,
         "type": "json",
     }
-    async with httpx.AsyncClient(timeout=5.0) as client:
-        resp = await client.get(EXT01_URL, params=params)
-        resp.raise_for_status()
-        data = resp.json()
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            resp = await client.get(EXT01_URL, params=params)
+            resp.raise_for_status()
+            data = resp.json()
+    except httpx.TimeoutException:
+        raise TimeoutError("식약처 API 응답 시간이 초과됐습니다.")
+    except httpx.HTTPError:
+        raise UpstreamError("식약처 API 호출에 실패했습니다.")
 
     items = data.get("body", {}).get("items")
     if not items:

@@ -4,6 +4,7 @@ import httpx
 from app.core.config import SERVICE_KEY
 from app.core.redis import get_redis
 from app.core.database import get_db
+from app.core.exceptions import UpstreamError, TimeoutError
 from app.models.drug import InteractionResponse, DrugRef
 from app.services.ai_service import translate_drug_info
 
@@ -104,10 +105,15 @@ async def _fetch_contraindications(item_seq: str) -> dict:
         "numOfRows": 100,
         "type": "json",
     }
-    async with httpx.AsyncClient(timeout=5.0) as client:
-        resp = await client.get(url, params=params)
-        resp.raise_for_status()
-        data = resp.json()
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            resp = await client.get(url, params=params)
+            resp.raise_for_status()
+            data = resp.json()
+    except httpx.TimeoutException:
+        raise TimeoutError("DUR API 응답 시간이 초과됐습니다.")
+    except httpx.HTTPError:
+        raise UpstreamError("DUR API 호출에 실패했습니다.")
 
     items = data.get("body", {}).get("items") or []
     return {item["MIXTURE_ITEM_SEQ"]: item for item in items if item.get("MIXTURE_ITEM_SEQ")}

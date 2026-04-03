@@ -8,7 +8,7 @@
 모든 기획 문서는 `docs/` 폴더에 있음.
 코드 작성 전 반드시 참고:
 - `docs/backend_spec.csv` — 기능명세서 (비즈니스 로직 · 요청/응답 상세)
-- `docs/schema.sql` — Supabase DB 스키마
+- `docs/schema.sql` — Neon PostgreSQL DB 스키마
 - `docs/external_api_spec.csv` — 식약처 공공 API 명세 (파라미터 · 응답 필드)
 - `docs/api_usage_examples.py` — 외부 API 호출 예시 코드
 - `docs/error_codes.csv` — 에러 코드 정의
@@ -18,15 +18,16 @@
 - **EasyOCR** — 약봉투 텍스트 추출 (한국어 지원)
 - **RapidFuzz** — OCR 결과 정규화 · 검색 관련도 정렬 (token_sort_ratio)
 - **Claude claude-haiku-4-5** (Anthropic SDK) — 의약 용어 → 쉬운 말 변환
-- **Redis** — API 응답 캐싱 (TTL: 약 상세 7일 · 검색 1일 · 병용금기 7일)
-- **Supabase** — PostgreSQL DB + Auth
+- **Redis** — API 응답 캐싱 (TTL: 약 상세 7일 · 검색 1일 · 병용금기 7일) · Upstash 서버리스
+- **Neon** — PostgreSQL 서버리스 DB
 - **httpx** — 외부 API 비동기 호출
+- **배포** — Render (https://yak-alda-backend.onrender.com)
 
 ## 내부 API 구조 (6개)
 
 | ID | 엔드포인트 | 설명 |
 |----|-----------|------|
-| OCR-01 | POST /api/v1/ocr/analyze | 이미지 → EasyOCR → RapidFuzz 정규화 → 약 정보 |
+| OCR-01 | POST /api/v1/ocr/analyze | 이미지 → EasyOCR → RapidFuzz 정규화 → 약 정보 (**임시 비활성화**) |
 | DRUG-01 | GET /api/v1/drugs/search | 약 이름 검색 · RapidFuzz 관련도 정렬 |
 | DRUG-02 | GET /api/v1/drugs/{drug_id} | 약 상세 조회 · AI 변환 포함 |
 | DRUG-03 | INTERNAL | RapidFuzz 정규화 함수 (엔드포인트 없음) |
@@ -43,7 +44,7 @@
 - 인증: `serviceKey` 쿼리 파라미터 (Decoded 값 사용 · httpx params= 에 넣으면 자동 인코딩)
 - 응답: 기본 XML → `type=json` 파라미터 필수
 
-## DB 스키마 (Supabase PostgreSQL)
+## DB 스키마 (Neon PostgreSQL)
 ```
 drugs         — 약 상세 정보 (식약처 원문 + AI 변환 결과)
 drug_names    — RapidFuzz 정규화용 전체 품목 목록 (초기 1회 적재 필요)
@@ -64,7 +65,7 @@ interaction:{id1}:{id2}     TTL 7일  — 병용금기 (id1 < id2 오름차순)
 - 식약처 원문 → 중학생도 이해할 수 있는 설명으로 변환
 - Pydantic으로 JSON 응답 파싱 · 실패 시 1회 재시도
 - 재시도 실패 시 official_raw 원문으로 fallback (서비스 중단 없음)
-- Supabase DB에 *_simple 컬럼이 NULL일 때만 호출 (중복 호출 방지)
+- Neon DB에 *_simple 컬럼이 NULL일 때만 호출 (중복 호출 방지)
 
 ### RapidFuzz 정규화 (DRUG-03)
 - token_sort_ratio 유사도 80% 이상만 허용

@@ -4,7 +4,8 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
-from app.routers import drugs, ocr, interaction
+from app.routers import drugs, interaction
+# from app.routers import ocr  # OCR: 메모리 이슈로 임시 비활성화
 from app.core.redis import init_redis, close_redis
 from app.core.database import init_db, close_db
 

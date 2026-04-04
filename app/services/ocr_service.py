@@ -1,56 +1,83 @@
+import base64
 import io
+import json
 import logging
-import numpy as np
+from typing import Optional
+
+import anthropic
 from PIL import Image
 from rapidfuzz import fuzz
-from typing import Optional
-import easyocr
+
+from app.core.config import ANTHROPIC_API_KEY
 from app.core.database import get_db
 
 logger = logging.getLogger(__name__)
 
-# 서버 시작 시 1회 초기화 (한국어+영어)
-_reader: Optional[easyocr.Reader] = None
+_client = anthropic.AsyncAnthropic(api_key=ANTHROPIC_API_KEY)
+
+VISION_PROMPT = (
+    "이 약봉투 또는 약 포장지 이미지에서 약 이름만 추출해주세요. "
+    "약 이름 외의 설명은 하지 마세요. "
+    "반드시 아래 JSON 형식으로만 응답하세요:\n"
+    '{"drug_names": ["약이름1", "약이름2"]}'
+)
 
 
-def get_reader() -> easyocr.Reader:
-    global _reader
-    if _reader is None:
-        _reader = easyocr.Reader(["ko", "en"], gpu=False)
-    return _reader
-
-
-def preprocess_image(image_bytes: bytes) -> np.ndarray:
-    """
-    EasyOCR 정확도 향상을 위한 이미지 전처리.
-    그레이스케일 → 리사이즈 (최대 1280px) → 이진화
-    """
-    img = Image.open(io.BytesIO(image_bytes)).convert("L")  # 그레이스케일
-
-    # 리사이즈 (최대 1280px)
-    max_size = 1280
+def _resize_image(image_bytes: bytes, max_size: int = 1280) -> bytes:
+    """토큰 절약을 위해 이미지 리사이즈 (최대 1280px)."""
+    img = Image.open(io.BytesIO(image_bytes))
     w, h = img.size
     if max(w, h) > max_size:
         ratio = max_size / max(w, h)
         img = img.resize((int(w * ratio), int(h * ratio)), Image.LANCZOS)
-
-    # 이진화 (threshold 128)
-    img = img.point(lambda x: 0 if x < 128 else 255, "1").convert("L")
-
-    return np.array(img)
+    buf = io.BytesIO()
+    fmt = img.format or "JPEG"
+    img.save(buf, format=fmt)
+    return buf.getvalue()
 
 
 async def extract_drug_names(image_bytes: bytes) -> tuple[list[str], list[str]]:
     """
-    이미지에서 텍스트 추출 후 약 이름 정규화.
+    Claude Vision으로 이미지에서 약 이름 추출 후 RapidFuzz 정규화.
     Returns: (ocr_raw, normalized)
     """
-    # OCR 텍스트 추출
-    img_array = preprocess_image(image_bytes)
-    reader = get_reader()
-    results = reader.readtext(img_array, detail=0)  # 텍스트만 추출
-    ocr_raw = [text.strip() for text in results if text.strip()]
-    logger.info(f"OCR 추출 결과: {ocr_raw}")
+    resized = _resize_image(image_bytes)
+    b64 = base64.standard_b64encode(resized).decode("utf-8")
+
+    try:
+        message = await _client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=256,
+            timeout=10,
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image",
+                            "source": {
+                                "type": "base64",
+                                "media_type": "image/jpeg",
+                                "data": b64,
+                            },
+                        },
+                        {"type": "text", "text": VISION_PROMPT},
+                    ],
+                }
+            ],
+        )
+        raw_text = message.content[0].text.strip()
+        if raw_text.startswith("```"):
+            raw_text = raw_text.split("```")[1]
+            if raw_text.startswith("json"):
+                raw_text = raw_text[4:]
+        data = json.loads(raw_text.strip())
+        ocr_raw = [name.strip() for name in data.get("drug_names", []) if name.strip()]
+    except Exception as e:
+        logger.warning(f"Vision OCR 실패: {e}")
+        return [], []
+
+    logger.info(f"Vision OCR 추출 결과: {ocr_raw}")
 
     # RapidFuzz로 공식 품목명 정규화
     normalized = []

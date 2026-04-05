@@ -31,16 +31,27 @@ VISION_PROMPT = (
 )
 
 
-def _resize_image(image_bytes: bytes, max_size: int = 1280) -> bytes:
-    """토큰 절약을 위해 이미지 리사이즈 (최대 1280px)."""
-    img = Image.open(io.BytesIO(image_bytes))
+def _preprocess_image(image_bytes: bytes, max_size: int = 1280) -> bytes:
+    """
+    Vision OCR 정확도 향상을 위한 이미지 전처리.
+    리사이즈 (최대 1280px) → 대비 강화 → JPEG 변환
+    """
+    from PIL import ImageEnhance
+    img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+
+    # 리사이즈 (최대 1280px, 토큰 절약)
     w, h = img.size
     if max(w, h) > max_size:
         ratio = max_size / max(w, h)
         img = img.resize((int(w * ratio), int(h * ratio)), Image.LANCZOS)
+
+    # 대비 강화 (약봉투 흐릿한 글씨 인식률 향상)
+    img = ImageEnhance.Contrast(img).enhance(1.5)
+    # 선명도 강화
+    img = ImageEnhance.Sharpness(img).enhance(2.0)
+
     buf = io.BytesIO()
-    fmt = img.format or "JPEG"
-    img.save(buf, format=fmt)
+    img.save(buf, format="JPEG", quality=90)
     return buf.getvalue()
 
 
@@ -49,7 +60,7 @@ async def extract_drug_names(image_bytes: bytes) -> tuple[list[str], list[str]]:
     Claude Vision으로 이미지에서 약 이름 추출 후 RapidFuzz 정규화.
     Returns: (ocr_raw, normalized)
     """
-    resized = _resize_image(image_bytes)
+    resized = _preprocess_image(image_bytes)
     b64 = base64.standard_b64encode(resized).decode("utf-8")
 
     try:

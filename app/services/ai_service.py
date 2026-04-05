@@ -30,6 +30,11 @@ async def translate_drug_info(raw_data: dict) -> Optional[AITranslation]:
                 system=SYSTEM_PROMPT,
                 messages=[{"role": "user", "content": user_prompt}],
             )
+            usage = message.usage
+            logger.info(
+                f"AI-01 토큰 사용: input={usage.input_tokens} output={usage.output_tokens} "
+                f"(attempt {attempt+1})"
+            )
             raw_text = message.content[0].text.strip()
             if raw_text.startswith("```"):
                 raw_text = raw_text.split("```")[1]

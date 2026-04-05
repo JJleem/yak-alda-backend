@@ -74,6 +74,10 @@ async def extract_drug_names(image_bytes: bytes) -> tuple[list[str], list[str]]:
                 }
             ],
         )
+        usage = message.usage
+        logger.info(
+            f"Vision OCR 토큰 사용: input={usage.input_tokens} output={usage.output_tokens}"
+        )
         raw_text = message.content[0].text.strip()
         if raw_text.startswith("```"):
             raw_text = raw_text.split("```")[1]
